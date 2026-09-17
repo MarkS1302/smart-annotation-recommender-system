@@ -32,6 +32,30 @@ test('users and roles pages are displayed', function (): void {
         );
 });
 
+test('users can be searched by name or email', function (): void {
+    $actor = User::factory()->create();
+    grantAdminPermissions($actor, ['view.users']);
+
+    User::factory()->create([
+        'name' => 'Ada Lovelace',
+        'email' => 'ada@example.com',
+    ]);
+    User::factory()->create([
+        'name' => 'Borin Flint',
+        'email' => 'borin@example.com',
+    ]);
+
+    $this->actingAs($actor)
+        ->get(route('users.index', [
+            'filter' => ['search' => 'ada@example.com'],
+        ]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('usersResourceCollection.meta.total', 1)
+            ->where('usersResourceCollection.data.0.email', 'ada@example.com')
+        );
+});
+
 test('super admin bypasses policies', function (): void {
     $user = User::factory()->create();
     Role::findOrCreate(RoleEnum::SuperAdmin->value, 'web');

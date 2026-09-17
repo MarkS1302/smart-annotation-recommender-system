@@ -9,12 +9,13 @@ use App\Http\Requests\Users\UpdateUserRequest;
 use App\Http\Resources\UserResource;
 use App\Models\Role;
 use App\Models\User;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Inertia\Inertia;
 use Inertia\Response;
 use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
 
 class UserController extends Controller
@@ -24,16 +25,13 @@ class UserController extends Controller
         $users = QueryBuilder::for(User::class)
             ->with('roles')
             ->allowedFilters(
-                AllowedFilter::callback('search', function (Builder $query, mixed $value): void {
-                    $search = trim((string) $value);
-
-                    $query->where(function (Builder $query) use ($search): void {
-                        $query->where('name', 'like', "%{$search}%")
-                            ->orWhere('email', 'like', "%{$search}%");
-                    });
-                }),
+                AllowedFilter::scope('search'),
             )
-            ->allowedSorts('name', 'email', 'created_at')
+            ->allowedSorts(
+                AllowedSort::field('name'),
+                AllowedSort::field('email'),
+                AllowedSort::field('created_at'),
+            )
             ->defaultSort('-created_at')
             ->paginate($request->integer('pageSize', 15))
             ->withQueryString();
@@ -53,12 +51,12 @@ class UserController extends Controller
         $validated = $request->validated();
 
         $user = User::create([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'password' => $validated['password'],
+            'name' => Arr::get($validated, 'name'),
+            'email' => Arr::get($validated, 'email'),
+            'password' => Arr::get($validated, 'password'),
         ]);
 
-        $user->syncRoles($validated['role_ids'] ?? []);
+        $user->syncRoles(Arr::get($validated, 'role_ids', []));
 
         activity('users')
             ->causedBy($request->user())
@@ -87,15 +85,17 @@ class UserController extends Controller
 
         $validated = $request->validated();
 
-        $user->name = $validated['name'];
-        $user->email = $validated['email'];
+        $user->name = Arr::get($validated, 'name');
+        $user->email = Arr::get($validated, 'email');
 
-        if (filled($validated['password'] ?? null)) {
-            $user->password = $validated['password'];
+        $password = Arr::get($validated, 'password');
+
+        if (filled($password)) {
+            $user->password = $password;
         }
 
         $user->save();
-        $user->syncRoles($validated['role_ids'] ?? []);
+        $user->syncRoles(Arr::get($validated, 'role_ids', []));
 
         activity('users')
             ->causedBy($request->user())

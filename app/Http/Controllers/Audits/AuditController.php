@@ -4,12 +4,13 @@ namespace App\Http\Controllers\Audits;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\AuditResource;
-use Illuminate\Database\Eloquent\Builder;
+use App\Models\Audit as SearchableAudit;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 use OwenIt\Auditing\Models\Audit;
 use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
 
 class AuditController extends Controller
@@ -17,25 +18,17 @@ class AuditController extends Controller
     public function index(Request $request): Response
     {
         $audits = QueryBuilder::for(
-            Audit::query()->with('user'),
+            SearchableAudit::query()->with('user'),
         )
             ->allowedFilters(
-                AllowedFilter::callback('search', function (Builder $query, mixed $value): void {
-                    $search = trim((string) $value);
-
-                    $query->where(function (Builder $query) use ($search): void {
-                        $query->where('auditable_type', 'like', "%{$search}%")
-                            ->orWhere('event', 'like', "%{$search}%")
-                            ->orWhere('ip_address', 'like', "%{$search}%")
-                            ->orWhere('user_agent', 'like', "%{$search}%")
-                            ->orWhereHas('user', function (Builder $query) use ($search): void {
-                                $query->where('name', 'like', "%{$search}%")
-                                    ->orWhere('email', 'like', "%{$search}%");
-                            });
-                    });
-                }),
+                AllowedFilter::scope('search'),
             )
-            ->allowedSorts('created_at', 'event', 'auditable_type', 'auditable_id')
+            ->allowedSorts(
+                AllowedSort::field('created_at'),
+                AllowedSort::field('event'),
+                AllowedSort::field('auditable_type'),
+                AllowedSort::field('auditable_id'),
+            )
             ->defaultSort('-created_at')
             ->paginate($request->integer('pageSize', 20))
             ->withQueryString();

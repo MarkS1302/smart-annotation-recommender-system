@@ -1,7 +1,7 @@
 <?php
 
-use App\Models\User;
 use App\Models\Permission;
+use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
 use OwenIt\Auditing\Models\Audit;
 use Spatie\Activitylog\Models\Activity;
@@ -58,5 +58,23 @@ test('audits and activity logs pages are displayed with resource data', function
             ->where('activityLogs.data.0.log_name', 'users')
             ->where('activityLogs.data.0.causer.id', $user->id)
             ->where('activityLogs.data.0.causer.email', $user->email)
+        );
+
+    $this->actingAs($user)
+        ->get(route('audits.index', [
+            'filter' => ['search' => 'Pest'],
+        ]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('auditsResourceCollection.meta.total', 1)
+        );
+
+    $this->actingAs($user)
+        ->get(route('activity-logs.index', [
+            'filter' => ['search' => 'User updated'],
+        ]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('activityLogs.meta.total', 1)
         );
 });

@@ -1,7 +1,9 @@
 <?php
 
-use App\Models\User;
+use App\Models\AiResponse;
+use App\Models\AnnotationSource;
 use App\Models\Role;
+use App\Models\User;
 use OwenIt\Auditing\Models\Audit;
 use Spatie\Activitylog\Models\Activity;
 
@@ -35,6 +37,21 @@ return [
             'model' => Activity::class,
             'permissions' => [
                 'view.activity-logs',
+            ],
+        ],
+        'annotation-sources' => [
+            'model' => AnnotationSource::class,
+            'permissions' => [
+                'view.annotation-sources',
+                'create.annotation-sources',
+                'update.annotation-sources',
+                'delete.annotation-sources',
+            ],
+        ],
+        'ai-responses' => [
+            'model' => AiResponse::class,
+            'permissions' => [
+                'view.ai-responses',
             ],
         ],
     ],

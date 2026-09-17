@@ -2,7 +2,10 @@
 
 namespace App\Support;
 
+use App\Models\AiResponse;
+use App\Models\AnnotationSource;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
@@ -24,15 +27,14 @@ class AiRequestEntityRegistry
     public function keys(): array
     {
         return array_map(
-            static fn (array $entity): string => $entity['value'],
+            static fn (array $entity): string => (string) Arr::get($entity, 'value'),
             $this->entities(),
         );
     }
 
     public function find(string $entity): ?array
     {
-        return collect($this->entities())
-            ->first(fn (array $candidate): bool => $candidate['value'] === $entity);
+        return collect($this->entities())->first(fn (array $candidate): bool => Arr::get($candidate, 'value') === $entity);
     }
 
     public function recordExists(string $entity, mixed $recordId): bool
@@ -44,11 +46,12 @@ class AiRequestEntityRegistry
     {
         $entityDefinition = $this->find($entity);
 
-        if ($entityDefinition === null) {
+        if (blank($entityDefinition)) {
             return null;
         }
 
-        $modelClass = $entityDefinition['modelClass'];
+        /** @var class-string<Model> $modelClass */
+        $modelClass = Arr::get($entityDefinition, 'modelClass');
 
         /** @var Model|null $record */
         $record = $modelClass::query()->find($recordId);
@@ -62,22 +65,12 @@ class AiRequestEntityRegistry
             ->map(fn (SplFileInfo $file): string => $this->classFromFile($file))
             ->filter(
                 static fn (string $modelClass): bool => class_exists($modelClass)
-                    && is_subclass_of($modelClass, Model::class),
+                    && is_subclass_of($modelClass, Model::class)
+                    && ! in_array($modelClass, [AiResponse::class, AnnotationSource::class], true),
             )
             ->values();
     }
 
-    /**
-     * @param  class-string<Model>  $modelClass
-     * @return array{
-     *     value: string,
-     *     label: string,
-     *     modelClass: class-string<Model>,
-     *     table: string,
-     *     primaryKey: string,
-     *     records: array<int, array{value: string, label: string}>
-     * }
-     */
     private function entityDefinition(string $modelClass): array
     {
         /** @var Model $model */
@@ -93,10 +86,6 @@ class AiRequestEntityRegistry
         ];
     }
 
-    /**
-     * @param  class-string<Model>  $modelClass
-     * @return array<int, array{value: string, label: string}>
-     */
     private function recordsFor(string $modelClass, Model $model): array
     {
         return $modelClass::query()
@@ -124,12 +113,12 @@ class AiRequestEntityRegistry
     {
         $attributes = $record->attributesToArray();
         $summaryColumn = collect(['name', 'title', 'email'])
-            ->first(fn (string $column): bool => array_key_exists($column, $attributes));
+            ->first(fn (string $column): bool => Arr::has($attributes, $column));
 
-        if ($summaryColumn !== null) {
+        if (filled($summaryColumn)) {
             return sprintf(
                 '%s (#%s)',
-                Str::limit((string) $attributes[$summaryColumn], 60),
+                Str::limit((string) Arr::get($attributes, $summaryColumn), 60),
                 $record->getKey(),
             );
         }

@@ -7,6 +7,7 @@ use App\Models\Permission;
 use App\Models\Role;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use OwenIt\Auditing\Models\Audit;
 
 class ToggleRolePermissionController extends Controller
@@ -18,12 +19,13 @@ class ToggleRolePermissionController extends Controller
         $validated = $request->validate([
             'enabled' => ['required', 'boolean'],
         ]);
+        $enabled = (bool) Arr::get($validated, 'enabled');
 
         $oldValues = [
             'permissions' => $role->permissions()->pluck('name')->all(),
         ];
 
-        if ($validated['enabled']) {
+        if ($enabled) {
             $role->givePermissionTo($permission);
         } else {
             $role->revokePermissionTo($permission);
@@ -39,7 +41,7 @@ class ToggleRolePermissionController extends Controller
                     'id' => $permission->id,
                     'name' => $permission->name,
                 ],
-                'enabled' => $validated['enabled'],
+                'enabled' => $enabled,
             ])
             ->event('updated')
             ->log('Role permission toggled');
@@ -57,7 +59,7 @@ class ToggleRolePermissionController extends Controller
                     'id' => $permission->id,
                     'name' => $permission->name,
                 ],
-                'enabled' => $validated['enabled'],
+                'enabled' => $enabled,
             ],
             'url' => $request->fullUrl(),
             'ip_address' => $request->ip(),

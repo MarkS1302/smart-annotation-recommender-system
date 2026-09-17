@@ -3,19 +3,23 @@
 namespace App\Providers;
 
 use App\Enums\RoleEnum;
+use App\Models\AiResponse;
+use App\Models\AnnotationSource;
+use App\Models\Role;
 use App\Models\User;
 use App\Policies\ActivityLogPolicy;
+use App\Policies\AiResponsePolicy;
+use App\Policies\AnnotationSourcePolicy;
 use App\Policies\AuditPolicy;
 use App\Policies\RolePolicy;
 use App\Policies\UserPolicy;
-use App\Models\Role;
 use Carbon\CarbonImmutable;
-use OwenIt\Auditing\Models\Audit;
 use Illuminate\Support\Facades\Date;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use OwenIt\Auditing\Models\Audit;
 use Spatie\Activitylog\Models\Activity;
 
 class AppServiceProvider extends ServiceProvider
@@ -69,6 +73,8 @@ class AppServiceProvider extends ServiceProvider
         });
 
         Gate::policy(User::class, UserPolicy::class);
+        Gate::policy(AnnotationSource::class, AnnotationSourcePolicy::class);
+        Gate::policy(AiResponse::class, AiResponsePolicy::class);
         Gate::policy(Role::class, RolePolicy::class);
         Gate::policy(Audit::class, AuditPolicy::class);
         Gate::policy(Activity::class, ActivityLogPolicy::class);

@@ -51,13 +51,13 @@ test('process ai request job stores ai service success result in cache', functio
         'status' => 'success',
         'entity' => 'user',
         'entity_label' => 'User',
-        'answer' => '{"annotations":[]}',
+        'answer' => '{"annotations":[],"uncertain_annotations":[]}',
         'error' => null,
     ]);
 
     expect(AiResponse::query()->firstOrFail())
         ->status->toBe('success')
-        ->answer->toBe('{"annotations":[]}');
+        ->answer->toBe('{"annotations":[],"uncertain_annotations":[]}');
 
     $audit = Audit::query()
         ->where('auditable_type', AiResponse::class)
@@ -112,7 +112,7 @@ test('process knowledge base request job returns matching tags without calling a
     $user = User::factory()->unverified()->create();
     $knowledgeBasePath = 'knowledge-base-test.sqlite';
     Storage::disk('local')->delete($knowledgeBasePath);
-    $database = new \PDO(sprintf('sqlite:%s', Storage::disk('local')->path($knowledgeBasePath)));
+    $database = new PDO(sprintf('sqlite:%s', Storage::disk('local')->path($knowledgeBasePath)));
     $database->exec('CREATE TABLE tags (slug TEXT PRIMARY KEY, label TEXT NOT NULL, category TEXT NOT NULL)');
     $database->exec('CREATE TABLE rules (entity TEXT NOT NULL, tag_slug TEXT NOT NULL, field TEXT, operator TEXT NOT NULL, value TEXT, rule_group TEXT, priority INTEGER NOT NULL, reason TEXT)');
     $database->exec("INSERT INTO tags (slug, label, category) VALUES ('user', 'User', 'entity'), ('email-unverified-user', 'Email unverified user', 'lifecycle')");

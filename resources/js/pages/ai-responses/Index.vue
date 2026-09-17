@@ -3,9 +3,11 @@ import { Head } from '@inertiajs/vue3';
 import { computed, h } from 'vue';
 import ViewAction from '@/components/DataTable/Actions/ViewAction.vue';
 import DataTable from '@/components/DataTable/DataTable.vue';
+import PermissionDeniedState from '@/components/PermissionDeniedState.vue';
 import { Badge } from '@/components/ui/badge';
 import { useDataTableColumn } from '@/composables/useDataTableColumn';
 import { index, show } from '@/routes/ai-responses';
+import { usePermissions } from '@/shared/hooks/use-permissions';
 import type { ResourceCollection } from '@/types/response/resource-collection';
 
 type AiResponse = Record<string, unknown> & {
@@ -19,6 +21,8 @@ type AiResponse = Record<string, unknown> & {
 defineProps<{
     aiResponses: ResourceCollection<AiResponse>;
 }>();
+
+const { canView } = usePermissions();
 
 const columns = computed(() =>
     useDataTableColumn<AiResponse>(
@@ -57,6 +61,7 @@ const columns = computed(() =>
         [
             {
                 component: ViewAction,
+                hasPermission: () => canView('ai-responses'),
                 actionRoute: (aiResponse) => show.url(aiResponse.id),
             },
         ],
@@ -76,12 +81,21 @@ defineOptions({
 </script>
 
 <template>
-    <Head title="AI responses" />
+    <div class="space-y-6">
+        <Head title="AI responses" />
 
-    <DataTable
-        title="AI responses"
-        description="Stored AI request results."
-        :columns="columns"
-        :resource-collection="aiResponses"
-    />
+        <PermissionDeniedState
+            v-if="!canView('ai-responses')"
+            resource="AI responses"
+            action="view"
+        />
+
+        <DataTable
+            v-else
+            title="AI responses"
+            description="Stored AI request results."
+            :columns="columns"
+            :resource-collection="aiResponses"
+        />
+    </div>
 </template>

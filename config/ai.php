@@ -229,7 +229,19 @@ PROMPT,
 
     'url' => env('AI_SERVICE_URL', 'http://localhost:11434/api/chat'),
 
-    'model' => env('env', 'gemma4'),
+    'model' => env('AI_SERVICE_MODEL', 'gemma4'),
+
+    'annotation' => [
+        'confidence_threshold' => (float) env('AI_ANNOTATION_CONFIDENCE_THRESHOLD', 0),
+        'stopwords' => array_values(array_filter(array_map(
+            static fn (string $word): string => trim($word),
+            explode(',', (string) env('AI_ANNOTATION_STOPWORDS', '')),
+        ))),
+        'category_weights' => json_decode(
+            (string) env('AI_ANNOTATION_CATEGORY_WEIGHTS', '{}'),
+            true,
+        ) ?: [],
+    ],
 
     'connect_timeout' => (int) env('AI_SERVICE_CONNECT_TIMEOUT', 3),
 

@@ -12,8 +12,10 @@ use App\Models\Role;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Inertia\Inertia;
 use OwenIt\Auditing\Models\Audit;
+use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
 
 class RoleController extends Controller
@@ -30,7 +32,11 @@ class RoleController extends Controller
         $roleResourceCollection = RoleResource::collection(
             QueryBuilder::for($query)
                 ->with(['permissions:id,name'])
-                ->allowedSorts('id', 'name', 'created_at')
+                ->allowedSorts(
+                    AllowedSort::field('id'),
+                    AllowedSort::field('name'),
+                    AllowedSort::field('created_at'),
+                )
                 ->paginate($request->integer('pageSize', 10))
                 ->withQueryString(),
         );
@@ -83,7 +89,7 @@ class RoleController extends Controller
         $oldValues = $this->roleAuditValues($role);
 
         $role->update([
-            'name' => $data['name'],
+            'name' => Arr::get($data, 'name'),
         ]);
 
         $this->recordAudit(
@@ -106,7 +112,7 @@ class RoleController extends Controller
 
         $data = $request->validated();
         $role = Role::create([
-            'name' => $data['name'],
+            'name' => Arr::get($data, 'name'),
             'guard_name' => 'web',
         ]);
 

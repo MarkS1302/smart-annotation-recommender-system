@@ -29,5 +29,10 @@ test('default roles command creates superadmin and admin roles', function (): vo
         'delete.roles',
         'view.audits',
         'view.activity-logs',
+        'view.annotation-sources',
+        'create.annotation-sources',
+        'update.annotation-sources',
+        'delete.annotation-sources',
+        'view.ai-responses',
     ]);
 });

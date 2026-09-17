@@ -5,9 +5,10 @@ namespace App\Console\Commands;
 use App\Enums\RoleEnum;
 use App\Models\Permission;
 use App\Models\Role;
-use Illuminate\Console\Command;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
+use Illuminate\Console\Command;
+use Illuminate\Support\Arr;
 use Spatie\Permission\PermissionRegistrar;
 
 #[Signature('roles:seed-defaults')]
@@ -33,7 +34,7 @@ class SeedDefaultRolesCommand extends Command
         $guardName = config('auth.defaults.guard', 'web');
 
         $permissionNames = collect(config('permissions.resources', []))
-            ->flatMap(fn (array $resource): array => $resource['permissions'] ?? [])
+            ->flatMap(fn (array $resource): array => Arr::get($resource, 'permissions', []))
             ->unique()
             ->values();
 

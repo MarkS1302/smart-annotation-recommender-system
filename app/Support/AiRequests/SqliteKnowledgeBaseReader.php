@@ -2,6 +2,7 @@
 
 namespace App\Support\AiRequests;
 
+use Illuminate\Support\Arr;
 use PDO;
 use RuntimeException;
 
@@ -26,7 +27,7 @@ class SqliteKnowledgeBaseReader
             $quotedTable = $this->quoteIdentifier((string) $table);
             $columns = $database->query(sprintf('PRAGMA table_info(%s)', $quotedTable))->fetchAll(PDO::FETCH_ASSOC);
             $column = collect($columns)->first(
-                fn (array $candidate): bool => strcasecmp((string) $candidate['name'], $tagColumn) === 0,
+                fn (array $candidate): bool => strcasecmp((string) Arr::get($candidate, 'name'), $tagColumn) === 0,
             );
 
             if ($column !== null) {
@@ -36,7 +37,7 @@ class SqliteKnowledgeBaseReader
             $knowledgeBaseTables[] = [
                 'name' => (string) $table,
                 'columns' => array_map(
-                    static fn (array $column): string => (string) $column['name'],
+                    static fn (array $column): string => (string) Arr::get($column, 'name'),
                     $columns,
                 ),
                 'rows' => $database->query(sprintf('SELECT * FROM %s', $quotedTable))->fetchAll(PDO::FETCH_ASSOC),

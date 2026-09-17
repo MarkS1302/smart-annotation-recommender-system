@@ -193,12 +193,15 @@ defineOptions({
                 v-if="aiRequests.length"
                 class="mt-4 divide-y rounded-lg border"
             >
-                <Link
+                <template
                     v-for="request in aiRequests"
                     :key="request.requestId"
-                    :href="requestUrl(request.id)"
-                    class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-muted/50"
                 >
+                    <Link
+                        v-if="canView('ai-responses')"
+                        :href="requestUrl(request.id)"
+                        class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-muted/50"
+                    >
                     <div class="min-w-0">
                         <p class="font-medium capitalize">
                             {{ request.entity }}
@@ -224,7 +227,38 @@ defineOptions({
                     >
                         {{ request.status }}
                     </Badge>
-                </Link>
+                    </Link>
+                    <div
+                        v-else
+                        class="flex items-center justify-between gap-4 px-4 py-3"
+                    >
+                    <div class="min-w-0">
+                        <p class="font-medium capitalize">
+                            {{ request.entity }}
+                        </p>
+                        <p class="truncate text-xs text-muted-foreground">
+                            {{
+                                request.createdAt
+                                    ? new Date(
+                                          request.createdAt,
+                                      ).toLocaleString()
+                                    : 'Just now'
+                            }}
+                        </p>
+                    </div>
+                    <Badge
+                        :variant="
+                            request.status === 'error'
+                                ? 'destructive'
+                                : request.status === 'pending'
+                                  ? 'secondary'
+                                  : 'default'
+                        "
+                    >
+                        {{ request.status }}
+                    </Badge>
+                    </div>
+                </template>
             </div>
 
             <p v-else class="mt-4 text-sm text-muted-foreground">

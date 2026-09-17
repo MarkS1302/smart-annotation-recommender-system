@@ -19,5 +19,10 @@ test('permissions sync command creates configured permissions', function (): voi
         'delete.roles',
         'view.audits',
         'view.activity-logs',
+        'view.annotation-sources',
+        'create.annotation-sources',
+        'update.annotation-sources',
+        'delete.annotation-sources',
+        'view.ai-responses',
     ]);
 });

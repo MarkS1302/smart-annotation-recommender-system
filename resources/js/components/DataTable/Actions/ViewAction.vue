@@ -1,22 +1,21 @@
 <script setup lang="ts">
 import { router } from '@inertiajs/vue3';
 import { Eye } from '@lucide/vue';
-import { isFunction } from 'lodash';
 import { Button } from '@/components/ui/button';
 
-const props = defineProps<{
+const {actionRoute, onClickHandler} = defineProps<{
     actionRoute?: string;
     onClickHandler?: () => void;
 }>();
 
 function handleClick(): void {
-    if (isFunction(props.onClickHandler)) {
-        props.onClickHandler();
+    if ((onClickHandler)) {
+        onClickHandler();
         return;
     }
 
-    if (props.actionRoute) {
-        router.visit(props.actionRoute);
+    if (actionRoute) {
+        router.visit(actionRoute);
     }
 }
 </script>

@@ -8,15 +8,12 @@ use Illuminate\Http\Request;
 /** @mixin AiResponse */
 class AiResponseResource extends BaseJsonResource
 {
-    /**
-     * Transform the resource into an array.
-     *
-     * @return array<string, mixed>
-     */
     public function toArray(Request $request): array
     {
         return [
             'id' => $this->id,
+            'input_source_id' => $this->input_source_id,
+            'knowledge_base_source_id' => $this->knowledge_base_source_id,
             'request_id' => $this->request_id,
             'entity' => $this->entity,
             'record_id' => $this->record_id,

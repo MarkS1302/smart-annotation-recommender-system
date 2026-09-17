@@ -9,12 +9,11 @@ class AiResponsePolicy
 {
     public function viewAny(User $user): bool
     {
-        return true;
+        return $user->can('view.ai-responses');
     }
 
     public function view(User $user, AiResponse $aiResponse): bool
     {
-        return $user->is($aiResponse->user);
+        return $user->can('view.ai-responses') && $user->is($aiResponse->user);
     }
-
 }

@@ -2,10 +2,11 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Permission;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
-use App\Models\Permission;
+use Illuminate\Support\Arr;
 use Spatie\Permission\PermissionRegistrar;
 
 #[Signature('permissions:sync {--prune : Remove permissions missing from config}')]
@@ -29,7 +30,7 @@ class SyncPermissionsCommand extends Command
     public function handle(): int
     {
         $permissionNames = collect(config('permissions.resources', []))
-            ->flatMap(fn (array $resource): array => $resource['permissions'] ?? [])
+            ->flatMap(fn (array $resource): array => Arr::get($resource, 'permissions', []))
             ->unique()
             ->values();
 

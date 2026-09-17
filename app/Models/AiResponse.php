@@ -10,6 +10,8 @@ use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 
 #[Fillable([
     'user_id',
+    'input_source_id',
+    'knowledge_base_source_id',
     'request_id',
     'entity',
     'record_id',
@@ -22,9 +24,6 @@ class AiResponse extends Model implements AuditableContract
 {
     use AuditableTrait;
 
-    /**
-     * Keep AI request lifecycle changes auditable when queue workers run in console mode.
-     */
     public static function isAuditingEnabled(): bool
     {
         return (bool) config('audit.enabled', true);
@@ -35,9 +34,16 @@ class AiResponse extends Model implements AuditableContract
         return $this->belongsTo(User::class);
     }
 
-    /**
-     * @return array<string, string>
-     */
+    public function inputSource(): BelongsTo
+    {
+        return $this->belongsTo(AnnotationSource::class, 'input_source_id');
+    }
+
+    public function knowledgeBaseSource(): BelongsTo
+    {
+        return $this->belongsTo(AnnotationSource::class, 'knowledge_base_source_id');
+    }
+
     protected function casts(): array
     {
         return [

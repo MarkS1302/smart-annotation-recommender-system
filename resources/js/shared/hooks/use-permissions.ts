@@ -1,8 +1,14 @@
-import { computed } from 'vue';
 import { usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
 import type { Auth } from '@/types/auth';
 
-type PermissionSubject = 'users' | 'roles' | 'audits' | 'activity-logs';
+type PermissionSubject =
+    | 'users'
+    | 'roles'
+    | 'audits'
+    | 'activity-logs'
+    | 'annotation-sources'
+    | 'ai-responses';
 
 type PageProps = {
     auth: Auth;

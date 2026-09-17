@@ -3,11 +3,15 @@
 namespace App\Jobs;
 
 use App\Models\AiResponse;
+use App\Support\AiRequests\AnnotationAnswerProcessor;
+use App\Support\AiRequests\AnnotationRecord;
+use App\Support\AiRequests\MetadataFeatureExtractor;
 use App\Support\AiRequests\SqliteKnowledgeBaseReader;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -27,21 +31,24 @@ class ProcessAiRequestJob implements ShouldQueue
 
     public function __construct(
         public string $requestId,
-        public Model $model,
+        public Model|AnnotationRecord $model,
         public string $prompt,
         public ?string $knowledgeBasePath = null,
         public ?string $tagColumn = null,
         public ?int $userId = null,
         public string $mode = 'ai',
-    ) {
-    }
+        public bool $deleteKnowledgeBaseAfterProcessing = true,
+    ) {}
 
-    public function handle(SqliteKnowledgeBaseReader $knowledgeBaseReader): void
-    {
-        $modelClass = $this->model::class;
-        $entity = Str::kebab(class_basename($modelClass));
-        $entityLabel = Str::headline(class_basename($modelClass));
-
+    public function handle(
+        SqliteKnowledgeBaseReader $knowledgeBaseReader,
+        ?MetadataFeatureExtractor $featureExtractor = null,
+        ?AnnotationAnswerProcessor $answerProcessor = null,
+    ): void {
+        $featureExtractor ??= new MetadataFeatureExtractor;
+        $answerProcessor ??= new AnnotationAnswerProcessor;
+        $entity = $this->entity();
+        $entityLabel = $this->entityLabel();
         $input = [];
 
         try {
@@ -59,15 +66,12 @@ class ProcessAiRequestJob implements ShouldQueue
                 [
                     'role' => 'user',
                     'content' => json_encode([
-                        'model' => class_basename($modelClass),
-                        'model_class' => $modelClass,
-                        'model_definition' => $this->modelDefinition($modelClass),
-                        'database_row' => $this->model->attributesToArray(),
-                        'database_schema' => [
-                            'table' => $this->model->getTable(),
-                            'primary_key' => $this->model->getKeyName(),
-                            'columns' => Schema::getColumnListing($this->model->getTable()),
-                        ],
+                        'model' => $this->modelName(),
+                        'model_class' => $this->modelClass(),
+                        'model_definition' => $this->modelDefinition(),
+                        'database_row' => $this->attributes(),
+                        'database_schema' => $this->databaseSchema(),
+                        'extracted_features' => $featureExtractor->extract($this->attributes()),
                         'existing_annotation_taxonomy' => $this->knowledgeBase($knowledgeBaseReader),
                     ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
                 ],
@@ -107,8 +111,8 @@ class ProcessAiRequestJob implements ShouldQueue
                 'entity' => $entity,
                 'entity_label' => $entityLabel,
                 'input' => $input,
-                'record_id' => (string) $this->model->getKey(),
-                'record' => $this->model->attributesToArray(),
+                'record_id' => $this->recordId(),
+                'record' => $this->attributes(),
                 'answer' => null,
                 'error' => $exception->getMessage(),
                 'ai_response' => null,
@@ -124,9 +128,9 @@ class ProcessAiRequestJob implements ShouldQueue
             'entity' => $entity,
             'entity_label' => $entityLabel,
             'input' => $input,
-            'record_id' => (string) $this->model->getKey(),
-            'record' => $this->model->attributesToArray(),
-            'answer' => data_get($aiResponse, 'message.content'),
+            'record_id' => $this->recordId(),
+            'record' => $this->attributes(),
+            'answer' => $answerProcessor->normalize(data_get($aiResponse, 'message.content')),
             'error' => null,
             'ai_response' => $aiResponse,
         ]);
@@ -140,23 +144,79 @@ class ProcessAiRequestJob implements ShouldQueue
         $this->deleteKnowledgeBase();
     }
 
-    /**
-     * @param  class-string  $modelClass
-     */
-    private function modelDefinition(string $modelClass): string
+    private function entity(): string
     {
+        return $this->model instanceof AnnotationRecord
+            ? $this->model->entity
+            : Str::kebab(class_basename($this->model));
+    }
+
+    private function entityLabel(): string
+    {
+        return $this->model instanceof AnnotationRecord
+            ? $this->model->entityLabel
+            : Str::headline(class_basename($this->model));
+    }
+
+    private function modelName(): string
+    {
+        return $this->model instanceof AnnotationRecord
+            ? $this->model->modelName()
+            : class_basename($this->model);
+    }
+
+    private function modelClass(): ?string
+    {
+        return $this->model instanceof AnnotationRecord ? $this->model->modelClass : $this->model::class;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function attributes(): array
+    {
+        return $this->model instanceof AnnotationRecord
+            ? $this->model->attributes
+            : $this->model->attributesToArray();
+    }
+
+    private function recordId(): string
+    {
+        return $this->model instanceof AnnotationRecord
+            ? $this->model->recordId
+            : (string) $this->model->getKey();
+    }
+
+    private function modelDefinition(): ?string
+    {
+        if ($this->model instanceof AnnotationRecord) {
+            return $this->model->modelDefinition;
+        }
+
         try {
-            $reflection = new ReflectionClass($modelClass);
+            $reflection = new ReflectionClass($this->model::class);
             $fileName = $reflection->getFileName();
 
-            if ($fileName === false) {
-                return '';
-            }
-
-            return file_get_contents($fileName) ?: '';
+            return $fileName === false ? null : (file_get_contents($fileName) ?: null);
         } catch (Throwable) {
-            return '';
+            return null;
         }
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function databaseSchema(): ?array
+    {
+        if ($this->model instanceof AnnotationRecord) {
+            return $this->model->databaseSchema;
+        }
+
+        return [
+            'table' => $this->model->getTable(),
+            'primary_key' => $this->model->getKeyName(),
+            'columns' => Schema::getColumnListing($this->model->getTable()),
+        ];
     }
 
     private function storeError(string $message): void
@@ -176,11 +236,14 @@ class ProcessAiRequestJob implements ShouldQueue
 
     private function knowledgeBase(SqliteKnowledgeBaseReader $reader): ?array
     {
-        if ($this->knowledgeBasePath === null) {
+        if (blank($this->knowledgeBasePath)) {
             return null;
         }
 
-        return $reader->read(Storage::disk('local')->path($this->knowledgeBasePath), $this->tagColumn ?? '');
+        return $reader->read(
+            Storage::disk('local')->path($this->knowledgeBasePath),
+            filled($this->tagColumn) ? $this->tagColumn : 'slug',
+        );
     }
 
     private function storeKnowledgeBaseResult(
@@ -189,7 +252,10 @@ class ProcessAiRequestJob implements ShouldQueue
         string $entityLabel,
     ): void {
         $knowledgeBase = $this->knowledgeBase($reader);
-        $tags = $this->tagsBySlug($this->knowledgeBaseRows($knowledgeBase, 'tags'));
+        $tags = $this->tagsBySlug(
+            $this->knowledgeBaseRows($knowledgeBase, 'tags'),
+            (string) Arr::get($knowledgeBase, 'tag_column'),
+        );
         $annotations = collect($this->knowledgeBaseRows($knowledgeBase, 'rules'))
             ->filter(fn (array $rule): bool => $this->knowledgeBaseValue($rule, 'entity') === $entity)
             ->filter(fn (array $rule): bool => $this->matchesKnowledgeBaseRule($rule))
@@ -200,7 +266,7 @@ class ProcessAiRequestJob implements ShouldQueue
             ->all();
 
         $result = [
-            'model' => class_basename($this->model),
+            'model' => $this->modelName(),
             'entity_type' => $entity,
             'summary' => 'Rule-based annotations from the knowledge database.',
             'annotations' => $annotations,
@@ -213,8 +279,8 @@ class ProcessAiRequestJob implements ShouldQueue
             'entity' => $entity,
             'entity_label' => $entityLabel,
             'input' => [],
-            'record_id' => (string) $this->model->getKey(),
-            'record' => $this->model->attributesToArray(),
+            'record_id' => $this->recordId(),
+            'record' => $this->attributes(),
             'answer' => json_encode($result, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
             'error' => null,
             'ai_response' => [
@@ -242,11 +308,13 @@ class ProcessAiRequestJob implements ShouldQueue
             return true;
         }
 
-        if (! is_string($field) || ! array_key_exists($field, $this->model->getAttributes())) {
+        $attributes = $this->attributes();
+
+        if (! is_string($field) || ! Arr::has($attributes, $field)) {
             return false;
         }
 
-        $value = $this->model->getAttribute($field);
+        $value = Arr::get($attributes, $field);
 
         return match ($operator) {
             'present' => filled($value),
@@ -265,11 +333,11 @@ class ProcessAiRequestJob implements ShouldQueue
     {
         $tagSlug = $this->knowledgeBaseValue($rule, 'tag_slug');
 
-        if (! is_string($tagSlug) || ! array_key_exists($tagSlug, $tags)) {
+        if (! is_string($tagSlug) || ! Arr::has($tags, $tagSlug)) {
             throw new RuntimeException('Every matching rule must reference a tag in the tags table.');
         }
 
-        $tag = $tags[$tagSlug];
+        $tag = Arr::get($tags, $tagSlug);
         $field = $this->knowledgeBaseValue($rule, 'field');
 
         return [
@@ -289,29 +357,29 @@ class ProcessAiRequestJob implements ShouldQueue
      */
     private function knowledgeBaseRows(array $knowledgeBase, string $tableName): array
     {
-        $table = collect($knowledgeBase['tables'])->first(
-            fn (array $table): bool => strcasecmp($table['name'], $tableName) === 0,
+        $table = collect(Arr::get($knowledgeBase, 'tables', []))->first(
+            fn (array $table): bool => strcasecmp((string) Arr::get($table, 'name'), $tableName) === 0,
         );
 
-        if ($table === null) {
+        if (blank($table)) {
             throw new RuntimeException(sprintf('The SQLite knowledge database must have a "%s" table.', $tableName));
         }
 
-        return $table['rows'];
+        return (array) Arr::get($table, 'rows', []);
     }
 
     /**
      * @param  array<int, array<string, mixed>>  $tags
      * @return array<string, array<string, mixed>>
      */
-    private function tagsBySlug(array $tags): array
+    private function tagsBySlug(array $tags, string $tagColumn): array
     {
         $tagsBySlug = [];
 
         foreach ($tags as $tag) {
-            $slug = $this->knowledgeBaseValue($tag, 'slug');
+            $slug = $this->knowledgeBaseValue($tag, $tagColumn);
 
-            if (is_string($slug) && $slug !== '') {
+            if (is_string($slug) && filled($slug)) {
                 $tagsBySlug[$slug] = $tag;
             }
         }
@@ -331,7 +399,7 @@ class ProcessAiRequestJob implements ShouldQueue
 
     private function deleteKnowledgeBase(): void
     {
-        if ($this->knowledgeBasePath !== null) {
+        if ($this->deleteKnowledgeBaseAfterProcessing && filled($this->knowledgeBasePath)) {
             Storage::disk('local')->delete($this->knowledgeBasePath);
         }
     }
@@ -352,17 +420,17 @@ class ProcessAiRequestJob implements ShouldQueue
 
         $aiResponse = $aiResponse->first();
 
-        if ($aiResponse === null) {
+        if (blank($aiResponse)) {
             return;
         }
 
         Auth::onceUsingId($aiResponse->user_id);
 
         $aiResponse->update([
-            'status' => $result['status'],
-            'answer' => $result['answer'],
-            'ai_response' => $result['ai_response'],
-            'error' => $result['error'],
+            'status' => Arr::get($result, 'status'),
+            'answer' => Arr::get($result, 'answer'),
+            'ai_response' => Arr::get($result, 'ai_response'),
+            'error' => Arr::get($result, 'error'),
         ]);
     }
 

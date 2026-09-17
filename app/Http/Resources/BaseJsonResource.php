@@ -26,11 +26,11 @@ class BaseJsonResource extends JsonResource
             return null;
         }
 
-        if ($dateTime instanceof DateTimeInterface) {
-            return $dateTime->format($outputFormat->value);
-        }
+        $date = $dateTime instanceof DateTimeInterface
+            ? Carbon::instance($dateTime)
+            : Carbon::createFromFormat($valueFormat->value, $dateTime, 'UTC');
 
-        return Carbon::createFromFormat($valueFormat->value, $dateTime)->format($outputFormat->value);
+        return $date->setTimezone((string) config('app.timezone'))->format($outputFormat->value);
     }
 
     protected function formatDate(
@@ -43,11 +43,11 @@ class BaseJsonResource extends JsonResource
             return null;
         }
 
-        if ($date instanceof DateTimeInterface) {
-            return $date->format($outputFormat->value);
-        }
+        $parsedDate = $date instanceof DateTimeInterface
+            ? Carbon::instance($date)
+            : Carbon::createFromFormat($valueFormat->value, $date, 'UTC');
 
-        return Carbon::createFromFormat($valueFormat->value, $date)->format($outputFormat->value);
+        return $parsedDate->setTimezone((string) config('app.timezone'))->format($outputFormat->value);
     }
 
     protected function formatBoolean(int|bool|null $value): ?bool
@@ -62,11 +62,13 @@ class BaseJsonResource extends JsonResource
     protected function timestamps(): array
     {
         return [
-            'created_at' => $this->created_at?->format(
-                DateFormat::DATE_TIME_GREEK->value,
+            'created_at' => $this->formatDateTime(
+                $this->created_at,
+                DateFormat::DATE_TIME_GREEK,
             ),
-            'updated_at' => $this->updated_at?->format(
-                DateFormat::DATE_TIME_GREEK->value,
+            'updated_at' => $this->formatDateTime(
+                $this->updated_at,
+                DateFormat::DATE_TIME_GREEK,
             ),
         ];
     }

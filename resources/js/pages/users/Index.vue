@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
 import { CircleCheck, CircleX } from '@lucide/vue';
-import { isEmpty } from 'lodash';
 import { computed, h, ref } from 'vue';
 import CreateButton from '@/components/Buttons/CreateButton.vue';
 import DeleteAction from '@/components/DataTable/Actions/DeleteAction.vue';
@@ -17,6 +16,8 @@ import { destroy, index, show } from '@/routes/users';
 import { usePermissions } from '@/shared/hooks/use-permissions';
 import type { User } from '@/types/models/user';
 import type { ResourceCollection } from '@/types/response/resource-collection';
+import { Role } from '@/types/models/role';
+import { isEmpty } from 'lodash';
 
 type Props = {
     filters: {
