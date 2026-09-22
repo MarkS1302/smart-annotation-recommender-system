@@ -27,7 +27,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('annotation-sources', AnnotationSourceController::class)->only(['index', 'store', 'update', 'destroy']);
 
     Route::resource('users', UserController::class)->except(['create', 'edit']);
-    Route::resource('roles', RoleController::class);
+    Route::resource('roles', RoleController::class)->except(['destroy']);
 
     Route::put('roles/{role}/permissions/{permission}', ToggleRolePermissionController::class)->name('roles.permissions.toggle');
 
